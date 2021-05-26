@@ -11,7 +11,7 @@ namespace NanoUNet
         /// <summary>
         /// Maximum size of an UDP datagram.
         /// </summary>
-        public const int MaxDatagramSize = 65507;
+        //public const int MaxDatagramSize = 65507;
 
         private const int DefaultSendBufSize = 65536;
         private const int DefaultRecvBufSize = 65536;
@@ -19,8 +19,6 @@ namespace NanoUNet
 #pragma warning disable IDE0032, IDE0044
         private NanoSockets.Socket m_socketHandle;
         private AddressFamily m_addressFamily;
-        private int m_recvBufferSize = DefaultRecvBufSize;
-        private int m_sendBufferSize = DefaultSendBufSize;
 
         private bool m_isConnected;
         private bool m_isBound;
@@ -87,6 +85,43 @@ namespace NanoUNet
             get => GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ExclusiveAddressUse) == 1;
             set => SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ExclusiveAddressUse, value);
         }
+        /// <summary>
+        /// Gets or sets a value that specifies the size of the receive buffer of the <see cref="NanoSocket"/>.
+        /// </summary>
+        public int ReceiveBufferSize
+        {
+            get
+            {
+                return GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer);
+            }
+            set
+            {
+                if (value < 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+                SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer, value);
+            }
+        }
+        /// <summary>
+        /// Gets or sets a value that specifies the size of the send buffer of the <see cref="NanoSocket"/>.
+        /// </summary>
+        public int SendBufferSize
+        {
+            get
+            {
+                return GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendBuffer);
+            }
+            set
+            {
+                if (value < 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+                SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendBuffer, value);
+            }
+        }
+
 
         /// <summary>
         /// Creates a new <see cref="NanoSocket"/>.
@@ -97,7 +132,7 @@ namespace NanoUNet
 
             m_addressFamily = family;
 
-            m_socketHandle = NanoSocketAPI.Create(m_sendBufferSize, m_recvBufferSize);
+            m_socketHandle = NanoSocketAPI.Create(DefaultSendBufSize, DefaultRecvBufSize);
         }
 
         /// <summary>
@@ -109,21 +144,20 @@ namespace NanoUNet
         {
             ValidateAddressFamily(family);
 
-            if (receiveBufferSize < 1)
-                throw new ArgumentOutOfRangeException(nameof(receiveBufferSize), "Value must be greater than zero.");
+            if (receiveBufferSize < 0)
+                throw new ArgumentOutOfRangeException(nameof(receiveBufferSize));
 
-            if (sendBufferSize < 1)
-                throw new ArgumentOutOfRangeException(nameof(sendBufferSize), "Value must be greater than zero.");
+            if (sendBufferSize < 0)
+                throw new ArgumentOutOfRangeException(nameof(receiveBufferSize));
 
             m_addressFamily = family;
-            m_recvBufferSize = receiveBufferSize;
-            m_sendBufferSize = sendBufferSize;
 
-            m_socketHandle = NanoSocketAPI.Create(m_sendBufferSize, m_recvBufferSize);
+            m_socketHandle = NanoSocketAPI.Create(receiveBufferSize, sendBufferSize);
         }
 
         ~NanoSocket()
             => Dispose(false);
+
 
         /// <summary>
         /// Establishes a connection to the remote host.
@@ -139,7 +173,6 @@ namespace NanoUNet
             m_isConnected = status == SocketError.Success;
             return status;
         }
-
         /// <summary>
         /// Establishes a connection to the remote host.
         /// </summary>
@@ -182,7 +215,6 @@ namespace NanoUNet
 
             return status;
         }
-
         /// <summary>
         /// Binds the <see cref="NanoSocket"/> to a specified endpoint.
         /// </summary>

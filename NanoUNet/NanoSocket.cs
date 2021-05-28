@@ -8,10 +8,12 @@ namespace NanoUNet
 {
     public sealed class NanoSocket : IDisposable
     {
-        //public const int MaxDatagramSize = 65507;
+        /// <summary>
+        /// Helper to ensure calls to WSAStartup / WSACleanup
+        /// </summary>
+        private static readonly LibInitializer libInit = new LibInitializer();
 
-        private const int DefaultSendBufSize = 65536;
-        private const int DefaultRecvBufSize = 65536;
+        public const int MaxDatagramSize = 65507;
 
 #pragma warning disable IDE0032, IDE0044
         private NanoSockets.Socket m_socketHandle;
@@ -23,19 +25,6 @@ namespace NanoUNet
         private bool m_isCleanedUp = false;
         private bool m_isBlocking = true;
 #pragma warning restore IDE0032, IDE0044
-
-        static NanoSocket()
-        {
-            NanoSocketAPI.Initialize();
-            NanoSocketAPI.Initialize();
-            NanoSocketAPI.Initialize();
-            NanoSocketAPI.Initialize();
-            NanoSocketAPI.Initialize();
-            NanoSocketAPI.Initialize();
-            NanoSocketAPI.Initialize();
-            NanoSocketAPI.Initialize();
-            NanoSocketAPI.Initialize();
-        }
 
         /// <summary>
         /// Gets the local endpoint.
@@ -221,7 +210,7 @@ namespace NanoUNet
 
             m_addressFamily = family;
 
-            m_socketHandle = NanoSocketAPI.Create(DefaultSendBufSize, DefaultRecvBufSize);
+            m_socketHandle = NanoSocketAPI.Create(1024 * 64, 1024 * 64);
         }
 
         /// <summary>
@@ -447,6 +436,19 @@ namespace NanoUNet
         {
             public const string GetSocketOptionError = "GetSocketOption returned an error.";
             public const string SetSocketOptionError = "SetSocketOption returned an error.";
+        }
+
+        private sealed class LibInitializer
+        {
+            public LibInitializer()
+            {
+                NanoSocketAPI.Initialize();
+            }
+
+            ~LibInitializer()
+            {
+                NanoSocketAPI.Deinitialize();
+            }
         }
     }
 }

@@ -236,45 +236,6 @@ namespace NanoUNet
         ~NanoSocket()
             => Dispose(false);
 
-
-        /// <summary>
-        /// Establishes a connection to the remote host.
-        /// </summary>
-        /// <param name="address">The Ip Address of the remote host.</param>
-        /// <param name="port">The port of the remote host.</param>
-        public SocketError Connect(Address address)
-        {
-            ThrowIfDisposed();
-
-            var status = (SocketError)NanoSocketAPI.Connect(m_socketHandle, ref address);
-
-            if (status == SocketError.Success)
-            {
-                m_isConnected = true;
-                m_rightEndPoint = address;
-            }
-
-            return status;
-        }
-        /// <summary>
-        /// Establishes a connection to the remote host.
-        /// </summary>
-        /// <param name="hostname">The hostname of the remote host.</param>
-        /// <param name="ip">The port of the remote host.</param>
-        public SocketError Connect(string hostname, ushort port)
-        {
-            if (hostname == null)
-                throw new ArgumentNullException(nameof(hostname));
-
-            var nanoAddress = default(Address);
-            nanoAddress.Port = port;
-
-            if (NanoSocketAPI.SetHostName(ref nanoAddress, hostname) != 0)
-                throw new ArgumentOutOfRangeException(nameof(hostname), $"Unable to resolve {hostname}.");
-
-            return Connect(nanoAddress);
-        }
-
         /// <summary>
         /// Binds the <see cref="UdpSocket"/> to a specified port.
         /// </summary>
@@ -319,33 +280,57 @@ namespace NanoUNet
             return status;
         }
 
-
         /// <summary>
-        /// Sets the specified Socket option setting to the specified boolean value.
+        /// Disposes the <see cref="NanoSocket"/> and frees the underlying resources.
         /// </summary>
-        /// <param name="optionLevel">One of the <see cref="SocketOptionLevel"/> values.</param>
-        /// <param name="optionName">One of the <see cref="SocketOptionName"/> values.</param>
-        /// <param name="optionValue">A value of the option.</param>
-        public void SetSocketOption(SocketOptionLevel optionLevel, SocketOptionName optionName, bool optionValue)
+        public void Close()
         {
-            SetSocketOption(optionLevel, optionName, optionValue ? 1 : 0);
+            Dispose(true);
         }
 
         /// <summary>
-        /// Sets the specified Socket option setting to the specified integer value.
+        /// Establishes a connection to the remote host.
         /// </summary>
-        /// <param name="optionLevel">One of the <see cref="SocketOptionLevel"/> values.</param>
-        /// <param name="optionName">One of the <see cref="SocketOptionName"/> values.</param>
-        /// <param name="optionValue">A value of the option.</param>
-        public void SetSocketOption(SocketOptionLevel optionLevel, SocketOptionName optionName, int optionValue)
+        /// <param name="address">The Ip Address of the remote host.</param>
+        /// <param name="port">The port of the remote host.</param>
+        public SocketError Connect(Address address)
         {
             ThrowIfDisposed();
 
-            var tempValue = optionValue;
+            var status = (SocketError)NanoSocketAPI.Connect(m_socketHandle, ref address);
 
-            if (NanoSocketAPI.SetOption(m_socketHandle, (int)optionLevel, (int)optionName, ref tempValue, sizeof(int)) != 0)
-                throw new InvalidOperationException(ErrorCodes.SetSocketOptionError);
+            if (status == SocketError.Success)
+            {
+                m_isConnected = true;
+                m_rightEndPoint = address;
+            }
+
+            return status;
         }
+        /// <summary>
+        /// Establishes a connection to the remote host.
+        /// </summary>
+        /// <param name="hostname">The hostname of the remote host.</param>
+        /// <param name="ip">The port of the remote host.</param>
+        public SocketError Connect(string hostname, ushort port)
+        {
+            if (hostname == null)
+                throw new ArgumentNullException(nameof(hostname));
+
+            var nanoAddress = default(Address);
+            nanoAddress.Port = port;
+
+            if (NanoSocketAPI.SetHostName(ref nanoAddress, hostname) != 0)
+                throw new ArgumentOutOfRangeException(nameof(hostname), $"Unable to resolve {hostname}.");
+
+            return Connect(nanoAddress);
+        }
+
+        /// <summary>
+        /// Releases all resources used by the current instance of the <see cref="NanoSocket"/> class.
+        /// </summary>
+        public void Dispose()
+            => Dispose(true);
 
         /// <summary>
         /// Returns the specified Socket option setting, represented as an integer.
@@ -366,6 +351,262 @@ namespace NanoUNet
         }
 
         /// <summary>
+        /// Determines the status of the <see cref="NanoSocket"/>.
+        /// </summary>
+        /// <param name="milliseconds">The time to wait for a response, in milliseconds.</param>
+        public bool Poll(int milliseconds)
+        {
+            ThrowIfDisposed();
+
+            return NanoSocketAPI.Poll(m_socketHandle, milliseconds) > 0;
+        }
+
+        /// <summary>
+        /// Receives data from a bound <see cref="NanoSocket"/> into a receive buffer.
+        /// </summary>
+        /// <param name="buffer">An array of type <see cref="byte"/> that is the storage location for the received data.</param>
+        public int Receive(byte[] buffer)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotConnected();
+            ValidateBufferArguments(buffer);
+
+            return NanoSocketAPI.Receive(m_socketHandle, IntPtr.Zero, buffer, buffer.Length);
+        }
+        /// <summary>
+        /// Receives data from a bound <see cref="NanoSocket"/> into a receive buffer.
+        /// </summary>
+        /// <param name="buffer">An array of type <see cref="byte"/> that is the storage location for the received data.</param>
+        /// <param name="size">The number of bytes to receive.</param>
+        public int Receive(byte[] buffer, int size)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotConnected();
+            ValidateBufferArguments(buffer, size);
+
+            return NanoSocketAPI.Receive(m_socketHandle, IntPtr.Zero, buffer, size);
+        }
+        /// <summary>
+        /// Receives data from a bound <see cref="NanoSocket"/> into a receive buffer.
+        /// </summary>
+        /// <param name="buffer">An array of type <see cref="byte"/> that is the storage location for the received data.</param>
+        /// <param name="offset">The location in buffer to store the received data.</param>
+        /// <param name="size">The number of bytes to receive.</param>
+        public int Receive(byte[] buffer, int offset, int size)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotConnected();
+            ValidateBufferArguments(buffer, offset, size);
+
+            return NanoSocketAPI.Receive(m_socketHandle, IntPtr.Zero, buffer, offset, size);
+        }
+        /// <summary>
+        /// Receives data from a bound <see cref="NanoSocket"/> into a receive buffer.
+        /// </summary>
+        /// <param name="buffer">An <see cref="IntPtr"/> that is the storage location for the received data.</param>
+        /// <param name="size">The number of bytes to receive.</param>
+        public int Receive(IntPtr buffer, int size)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotConnected();
+            ValidateBufferArguments(buffer, size);
+
+            return NanoSocketAPI.Receive(m_socketHandle, IntPtr.Zero, buffer, size);
+        }
+
+        /// <summary>
+        /// Receives a datagram into the data buffer and stores the endpoint.
+        /// </summary>
+        /// <param name="buffer">An array of type <see cref="byte"/> that is the storage location for the received data.</param>
+        /// <param name="address">An <see cref="Address"/>, passed by reference, that represents the address of the sender.</param>
+        public int ReceiveFrom(byte[] buffer, ref Address remoteEP)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotBound();
+            ValidateBufferArguments(buffer);
+
+            return NanoSocketAPI.Receive(m_socketHandle, ref remoteEP, buffer, buffer.Length);
+        }
+        /// <summary>
+        /// Receives a datagram into the data buffer and stores the endpoint.
+        /// </summary>
+        /// <param name="buffer">An array of type <see cref="byte"/> that is the storage location for the received data.</param>
+        /// <param name="size">The number of bytes to receive.</param>
+        /// <param name="address">An <see cref="Address"/>, passed by reference, that represents the address of the sender.</param>
+        /// <returns></returns>
+        public int ReceiveFrom(byte[] buffer, int size, ref Address remoteEP)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotBound();
+            ValidateBufferArguments(buffer, size);
+
+            return NanoSocketAPI.Receive(m_socketHandle, ref remoteEP, buffer, size);
+        }
+        /// <summary>
+        /// Receives a datagram into the data buffer and stores the endpoint.
+        /// </summary>
+        /// <param name="buffer">An array of type <see cref="byte"/> that is the storage location for the received data.</param>
+        /// <param name="offset">The location in buffer to store the received data.</param>
+        /// <param name="size">The number of bytes to receive.</param>
+        /// <param name="address">An <see cref="Address"/>, passed by reference, that represents the address of the sender.</param>
+        public int ReceiveFrom(byte[] buffer, int offset, int size, ref Address remoteEP)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotBound();
+            ValidateBufferArguments(buffer, offset, size);
+
+            return NanoSocketAPI.Receive(m_socketHandle, ref remoteEP, buffer, offset, size);
+        }
+        /// <summary>
+        /// Receives a datagram into the data buffer and stores the endpoint.
+        /// </summary>
+        /// <param name="buffer">An <see cref="IntPtr"/> that is the storage location for the received data.</param>
+        /// <param name="size">The number of bytes to receive.</param>
+        /// <param name="address">An <see cref="Address"/>, passed by reference, that represents the address of the sender.</param>
+        public int ReceiveFrom(IntPtr buffer, int size, ref Address remoteEP)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotBound();
+            ValidateBufferArguments(buffer, size);
+
+            return NanoSocketAPI.Receive(m_socketHandle, ref remoteEP, buffer, size);
+        }
+
+        /// <summary>
+        /// Sends data to a connected <see cref="NanoSocket"/>.
+        /// </summary>
+        /// <param name="buffer">An array of type <see cref="System.Byte"/> that contains the data to be sent.</param>
+        public int Send(byte[] buffer)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotConnected();
+            ValidateBufferArguments(buffer);
+
+            return NanoSocketAPI.Send(m_socketHandle, IntPtr.Zero, buffer, buffer.Length);
+        }
+        /// <summary>
+        /// Sends data to a connected <see cref="NanoSocket"/>.
+        /// </summary>
+        /// <param name="buffer">An array of type <see cref="System.Byte"/> that contains the data to be sent.</param>
+        /// <param name="size">The number of bytes to send.</param>
+        public int Send(byte[] buffer, int size)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotConnected();
+            ValidateBufferArguments(buffer, size);
+
+            return NanoSocketAPI.Send(m_socketHandle, IntPtr.Zero, buffer, size);
+        }
+        /// <summary>
+        /// Sends data to a connected <see cref="NanoSocket"/>.
+        /// </summary>
+        /// <param name="buffer">An array of type <see cref="System.Byte"/> that contains the data to be sent.</param>
+        /// <param name="size">The number of bytes to send.</param>
+        /// <param name="offset">The position in the data buffer at which to begin sending data.</param>
+        public int Send(byte[] buffer, int offset, int size)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotConnected();
+            ValidateBufferArguments(buffer, offset, size);
+
+            return NanoSocketAPI.Send(m_socketHandle, IntPtr.Zero, buffer, offset, size);
+        }
+        /// <summary>
+        /// Sends data to a connected <see cref="NanoSocket"/>.
+        /// </summary>
+        /// <param name="buffer">An <see cref="IntPtr"/> that contains the data to be sent.</param>
+        /// <param name="size">The number of bytes to send.</param>
+        public int Send(IntPtr buffer, int size)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotConnected();
+            ValidateBufferArguments(buffer, size);
+
+            return NanoSocketAPI.Send(m_socketHandle, IntPtr.Zero, buffer, size);
+        }
+
+        /// <summary>
+        /// Sends data to the specified endpoint.
+        /// </summary>
+        /// <param name="buffer">An array of type <see cref="System.Byte"/> that contains the data to be sent.</param>
+        /// <param name="remoteEP">The <see cref="Address"/> that represents the destination for the data.</param>
+        public int SendTo(byte[] buffer, ref Address remoteEP)
+        {
+            ThrowIfDisposed();
+            ValidateBufferArguments(buffer);
+
+            return NanoSocketAPI.Send(m_socketHandle, ref remoteEP, buffer, buffer.Length);
+        }
+        /// <summary>
+        /// Sends data to the specified endpoint.
+        /// </summary>
+        /// <param name="buffer">An array of type <see cref="System.Byte"/> that contains the data to be sent.</param>
+        /// <param name="size">The number of bytes to send.</param>
+        /// <param name="remoteEP">The <see cref="Address"/> that represents the destination for the data.</param>
+        public int SendTo(byte[] buffer, int size, ref Address remoteEP)
+        {
+            ThrowIfDisposed();
+            ValidateBufferArguments(buffer);
+
+            return NanoSocketAPI.Send(m_socketHandle, ref remoteEP, buffer, size);
+        }
+        /// <summary>
+        /// Sends data to the specified endpoint.
+        /// </summary>
+        /// <param name="buffer">An array of type <see cref="System.Byte"/> that contains the data to be sent.</param>
+        /// <param name="offset">The position in the data buffer at which to begin sending data.</param>
+        /// <param name="size">The number of bytes to send.</param>
+        /// <param name="remoteEP">The <see cref="Address"/> that represents the destination for the data.</param>
+        public int SendTo(byte[] buffer, int offset, int size, ref Address remoteEP)
+        {
+            ThrowIfDisposed();
+            ValidateBufferArguments(buffer, offset, size);
+
+            return NanoSocketAPI.Send(m_socketHandle, ref remoteEP, buffer, offset, size);
+        }
+        /// <summary>
+        /// Sends data to the specified endpoint.
+        /// </summary>
+        /// <param name="buffer">An <see cref="IntPtr"/> that contains the data to be sent.</param>
+        /// <param name="size">The number of bytes to send.</param>
+        /// <param name="remoteEP">The <see cref="Address"/> that represents the destination for the data.</param>
+        public int SendTo(IntPtr buffer, int size, ref Address removeEP)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotConnected();
+            ValidateBufferArguments(buffer, size);
+
+            return NanoSocketAPI.Send(m_socketHandle, ref removeEP, buffer, size);
+        }
+
+
+        /// <summary>
+        /// Sets the specified Socket option setting to the specified boolean value.
+        /// </summary>
+        /// <param name="optionLevel">One of the <see cref="SocketOptionLevel"/> values.</param>
+        /// <param name="optionName">One of the <see cref="SocketOptionName"/> values.</param>
+        /// <param name="optionValue">A value of the option.</param>
+        public void SetSocketOption(SocketOptionLevel optionLevel, SocketOptionName optionName, bool optionValue)
+        {
+            SetSocketOption(optionLevel, optionName, optionValue ? 1 : 0);
+        }
+        /// <summary>
+        /// Sets the specified Socket option setting to the specified integer value.
+        /// </summary>
+        /// <param name="optionLevel">One of the <see cref="SocketOptionLevel"/> values.</param>
+        /// <param name="optionName">One of the <see cref="SocketOptionName"/> values.</param>
+        /// <param name="optionValue">A value of the option.</param>
+        public void SetSocketOption(SocketOptionLevel optionLevel, SocketOptionName optionName, int optionValue)
+        {
+            ThrowIfDisposed();
+
+            var tempValue = optionValue;
+
+            if (NanoSocketAPI.SetOption(m_socketHandle, (int)optionLevel, (int)optionName, ref tempValue, sizeof(int)) != 0)
+                throw new InvalidOperationException(ErrorCodes.SetSocketOptionError);
+        }
+
+        /// <summary>
         /// Sets the <see cref="NanoSocket"/> to blocking mode.
         /// </summary>
         public void SetNonBlocking()
@@ -374,14 +615,6 @@ namespace NanoUNet
                 throw new InvalidOperationException(ErrorCodes.SetSocketOptionError);
 
             m_isBlocking = false;
-        }
-
-        /// <summary>
-        /// Disposes the <see cref="NanoSocket"/> and frees the underlying resources.
-        /// </summary>
-        public void Close()
-        {
-            Dispose(true);
         }
 
         private void Dispose(bool disposing)
@@ -400,12 +633,7 @@ namespace NanoUNet
             m_isBound = false;
         }
 
-        /// <summary>
-        /// Releases all resources used by the current instance of the <see cref="NanoSocket"/> class.
-        /// </summary>
-        public void Dispose()
-            => Dispose(true);
-
+        #region Validation
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ThrowIfDisposed()
         {
@@ -423,6 +651,24 @@ namespace NanoUNet
             void ThrowSocketAlreadyyBoundException() => throw new InvalidOperationException("Socket is already bound.");
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ThrowIfNotConnected()
+        {
+            if (!m_isConnected)
+                ThrowDgramSocketNotConnected();
+
+            void ThrowDgramSocketNotConnected() => throw new InvalidOperationException("Cannot send to, or receive from an arbitrary host while not conneceted.");
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ThrowIfNotBound()
+        {
+            if (!m_isBound)
+                ThrowSocketNotBound();
+
+            void ThrowSocketNotBound() => throw new InvalidOperationException("You must call the Bind method before performing this operation.");
+        }
+
         private void ValidateAddressFamily(AddressFamily family)
         {
             if (family != AddressFamily.InterNetwork &&
@@ -431,6 +677,44 @@ namespace NanoUNet
                 throw new ArgumentException("Invalid AddressFamily for UDP protocol.", nameof(family));
             }
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void ValidateBufferArguments(byte[] buffer)
+        {
+            if (buffer == null)
+                throw new ArgumentNullException(nameof(buffer));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void ValidateBufferArguments(byte[] buffer, int size)
+        {
+            if (buffer == null)
+                throw new ArgumentNullException(nameof(buffer));
+
+            if ((uint)size > (uint)buffer.Length)
+                throw new ArgumentOutOfRangeException(nameof(size));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void ValidateBufferArguments(byte[] buffer, int offset, int size)
+        {
+            if (buffer == null)
+                throw new ArgumentNullException(nameof(buffer));
+
+            if ((uint)offset > (uint)buffer.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+
+            if ((uint)size > (uint)(buffer.Length - offset))
+                throw new ArgumentOutOfRangeException(nameof(size));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void ValidateBufferArguments(IntPtr buffer, int size)
+        {
+            if (buffer == IntPtr.Zero)
+                throw new ArgumentNullException(nameof(buffer));
+        }
+        #endregion
 
         private static class ErrorCodes
         {

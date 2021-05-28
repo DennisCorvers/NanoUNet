@@ -8,9 +8,6 @@ namespace NanoUNet
 {
     public sealed class NanoSocket : IDisposable
     {
-        /// <summary>
-        /// Maximum size of an UDP datagram.
-        /// </summary>
         //public const int MaxDatagramSize = 65507;
 
         private const int DefaultSendBufSize = 65536;
@@ -18,64 +15,79 @@ namespace NanoUNet
 
 #pragma warning disable IDE0032, IDE0044
         private NanoSockets.Socket m_socketHandle;
+        private Address m_rightEndPoint;
         private AddressFamily m_addressFamily;
 
-        private bool m_isConnected;
-        private bool m_isBound;
-        private bool m_isCleanedUp;
+        private bool m_isConnected = false;
+        private bool m_isBound = false;
+        private bool m_isCleanedUp = false;
+        private bool m_isBlocking = true;
 #pragma warning restore IDE0032, IDE0044
 
         static NanoSocket()
         {
             NanoSocketAPI.Initialize();
+            NanoSocketAPI.Initialize();
+            NanoSocketAPI.Initialize();
+            NanoSocketAPI.Initialize();
+            NanoSocketAPI.Initialize();
+            NanoSocketAPI.Initialize();
+            NanoSocketAPI.Initialize();
+            NanoSocketAPI.Initialize();
+            NanoSocketAPI.Initialize();
         }
 
+        /// <summary>
+        /// Gets the local endpoint.
+        /// </summary>
+        public Address LocalEndPoint
+        {
+            get
+            {
+                ThrowIfDisposed();
+
+                Address localEP = default(Address);
+                if (NanoSocketAPI.GetAddress(m_socketHandle, ref localEP) != SocketStatus.OK)
+                    return default(Address);
+
+                return localEP;
+            }
+        }
+        /// <summary>
+        /// Gets the remote endpoint.
+        /// </summary>
+        public Address RemoteEndPoint
+        {
+            get
+            {
+                ThrowIfDisposed();
+
+                if (!m_isConnected)
+                    return default(Address);
+
+                return m_rightEndPoint;
+            }
+        }
+        /// <summary>
+        /// Gets a value that indicates whether the <see cref="NanoSocket"/> is in blocking mode.
+        /// </summary>
+        public bool Blocking
+            => m_isBlocking;
         /// <summary>
         /// Indicates if the <see cref="NanoSocket"/> is connected.
         /// </summary>
         public bool Connected
             => m_isConnected;
         /// <summary>
+        /// Gets the protocol type of the <see cref="NanoSocket"/>.
+        /// </summary>
+        public ProtocolType ProtocolType
+            => ProtocolType.Udp;
+        /// <summary>
         /// Indicates if the <see cref="NanoSocket"/> is bound to a port.
         /// </summary>
         public bool IsBound
             => m_isBound;
-        /// <summary>
-        /// Gets or sets a value that specifies the Time to Live (TTL) value of Internet
-        /// Protocol (IP) packets sent by the <see cref="NanoSocket"/>.
-        /// </summary>
-        public byte Ttl
-        {
-            get => (byte)GetSocketOption(SocketOptionLevel.IP, SocketOptionName.IpTimeToLive);
-            set => SetSocketOption(SocketOptionLevel.IP, SocketOptionName.IpTimeToLive, value);
-        }
-        /// <summary>
-        /// Gets or sets a <see cref="bool"/> value that specifies whether the <see cref="NanoSocket"/>
-        /// allows Internet Protocol (IP) datagrams to be fragmented.
-        /// </summary>
-        public bool DontFragment
-        {
-            get => GetSocketOption(SocketOptionLevel.IP, SocketOptionName.DontFragment) == 1;
-            set => SetSocketOption(SocketOptionLevel.IP, SocketOptionName.DontFragment, value);
-        }
-        /// <summary>
-        /// Gets or sets a <see cref="bool"/> value that specifies whether outgoing multicast
-        /// packets are delivered to the sending application.
-        /// </summary>
-        public bool MulticastLoopback
-        {
-            get => GetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback) == 1;
-            set => SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback, value);
-        }
-        /// <summary>
-        /// Gets or sets a <see cref="bool"/> value that specifies whether the <see cref="NanoSocket"/>
-        /// may send or receive broadcast packets.
-        /// </summary>
-        public bool EnableBroadcast
-        {
-            get => GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast) == 1;
-            set => SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, value);
-        }
         /// <summary>
         /// Gets or sets a <see cref="bool"/> value that specifies whether the <see cref="NanoSocket"/>
         /// allows only one client to use a port.
@@ -120,6 +132,83 @@ namespace NanoUNet
                 }
                 SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendBuffer, value);
             }
+        }
+        /// <summary>
+        /// Gets or sets a value that specifies the amount of time after which a synchronous
+        /// <see cref="NanoSocket"/>.Receive call will time out.
+        /// </summary>
+        public int ReceiveTimeout
+        {
+            get
+            {
+                return GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout);
+            }
+            set
+            {
+                if (value < 0)
+                    value = 0;
+
+                SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, value);
+            }
+        }
+        /// <summary>
+        /// Gets or sets a value that specifies the amount of time after which a synchronous
+        /// <see cref="NanoSocket"/>.Send call will time out.
+        /// </summary>
+        public int SendTimeout
+        {
+            get
+            {
+                return GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendTimeout);
+            }
+            set
+            {
+                if (value < 0)
+                    value = 0;
+
+                SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendTimeout, value);
+            }
+        }
+        /// <summary>
+        /// Gets or sets a value that specifies the Time to Live (TTL) value of Internet
+        /// Protocol (IP) packets sent by the <see cref="NanoSocket"/>.
+        /// </summary>
+        public byte Ttl
+        {
+            get => (byte)GetSocketOption(SocketOptionLevel.IP, SocketOptionName.IpTimeToLive);
+            set => SetSocketOption(SocketOptionLevel.IP, SocketOptionName.IpTimeToLive, value);
+        }
+        /// <summary>
+        /// Gets or sets a <see cref="bool"/> value that specifies whether the <see cref="NanoSocket"/>
+        /// allows Internet Protocol (IP) datagrams to be fragmented.
+        /// </summary>
+        public bool DontFragment
+        {
+            get => GetSocketOption(SocketOptionLevel.IP, SocketOptionName.DontFragment) == 1;
+            set => SetSocketOption(SocketOptionLevel.IP, SocketOptionName.DontFragment, value);
+        }
+        /// <summary>
+        /// Gets or sets a <see cref="bool"/> value that specifies whether outgoing multicast
+        /// packets are delivered to the sending application.
+        /// </summary>
+        public bool MulticastLoopback
+        {
+            get => GetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback) == 1;
+            set => SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback, value);
+        }
+        /// <summary>
+        /// Gets the type of the <see cref="NanoSocket"/>.
+        /// </summary>
+        public SocketType SocketType
+            => SocketType.Dgram;
+        /// <summary>
+        /// Gets or sets a <see cref="bool"/> value that specifies whether the <see cref="NanoSocket"/>
+        /// may send or receive broadcast packets.
+        /// </summary>
+        public bool EnableBroadcast
+        {
+            get => GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast) == 1;
+            set => SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, value);
         }
 
 
@@ -170,7 +259,12 @@ namespace NanoUNet
 
             var status = (SocketError)NanoSocketAPI.Connect(m_socketHandle, ref address);
 
-            m_isConnected = status == SocketError.Success;
+            if (status == SocketError.Success)
+            {
+                m_isConnected = true;
+                m_rightEndPoint = address;
+            }
+
             return status;
         }
         /// <summary>
@@ -283,6 +377,17 @@ namespace NanoUNet
         }
 
         /// <summary>
+        /// Sets the <see cref="NanoSocket"/> to blocking mode.
+        /// </summary>
+        public void SetNonBlocking()
+        {
+            if (NanoSocketAPI.SetNonBlocking(m_socketHandle) != SocketStatus.OK)
+                throw new InvalidOperationException(ErrorCodes.SetSocketOptionError);
+
+            m_isBlocking = false;
+        }
+
+        /// <summary>
         /// Disposes the <see cref="NanoSocket"/> and frees the underlying resources.
         /// </summary>
         public void Close()
@@ -340,7 +445,6 @@ namespace NanoUNet
 
         private static class ErrorCodes
         {
-            public const string InvalidProtocolVersion = "This protocol version is not supported";
             public const string GetSocketOptionError = "GetSocketOption returned an error.";
             public const string SetSocketOptionError = "SetSocketOption returned an error.";
         }

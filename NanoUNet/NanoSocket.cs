@@ -58,10 +58,20 @@ namespace NanoUNet
             }
         }
         /// <summary>
-        /// Gets a value that indicates whether the <see cref="NanoSocket"/> is in blocking mode.
+        /// Gets or sets a bool that indicates whether the <see cref="NanoSocket"/> is in blocking mode.
         /// </summary>
         public bool Blocking
-            => m_isBlocking;
+        {
+            get
+            {
+                return m_isBlocking;
+            }
+            set
+            {
+                NanoSocketAPI.SetNonBlocking(m_socketHandle, value);
+                m_isBlocking = value;
+            }
+        }
         /// <summary>
         /// Indicates if the <see cref="NanoSocket"/> is connected.
         /// </summary>
@@ -345,7 +355,7 @@ namespace NanoUNet
             int tempLength = sizeof(int);
 
             if (NanoSocketAPI.GetOption(m_socketHandle, (int)optionLevel, (int)optionName, ref tempValue, ref tempLength) != 0)
-                throw new InvalidOperationException(ErrorCodes.GetSocketOptionError);
+                throw new InvalidOperationException("GetSocketOption returned an error.");
 
             return tempValue;
         }
@@ -603,18 +613,7 @@ namespace NanoUNet
             var tempValue = optionValue;
 
             if (NanoSocketAPI.SetOption(m_socketHandle, (int)optionLevel, (int)optionName, ref tempValue, sizeof(int)) != 0)
-                throw new InvalidOperationException(ErrorCodes.SetSocketOptionError);
-        }
-
-        /// <summary>
-        /// Sets the <see cref="NanoSocket"/> to blocking mode.
-        /// </summary>
-        public void SetNonBlocking()
-        {
-            if (NanoSocketAPI.SetNonBlocking(m_socketHandle) != SocketStatus.OK)
-                throw new InvalidOperationException(ErrorCodes.SetSocketOptionError);
-
-            m_isBlocking = false;
+                throw new InvalidOperationException("SetSocketOption returned an error.");
         }
 
         private void Dispose(bool disposing)
@@ -715,12 +714,6 @@ namespace NanoUNet
                 throw new ArgumentNullException(nameof(buffer));
         }
         #endregion
-
-        private static class ErrorCodes
-        {
-            public const string GetSocketOptionError = "GetSocketOption returned an error.";
-            public const string SetSocketOptionError = "SetSocketOption returned an error.";
-        }
 
         private sealed class LibInitializer
         {
